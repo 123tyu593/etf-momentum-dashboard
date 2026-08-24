@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ETF动量轮动 · 模拟盘</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:#0a0c14;color:#e5e5e5;min-height:100vh}
+.container{max-width:1200px;margin:0 auto;padding:32px 24px}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid #1e2130}
+.header h1{font-size:22px;font-weight:700;color:#fff}
+.header h1 span{color:#4B3FE3}
+.update-time{font-size:12px;color:#666}
+.banner{background:linear-gradient(135deg,#1a1f3a,#2d1b4e);border:1px solid #2a2f45;border-radius:12px;padding:18px 24px;margin-bottom:20px;display:flex;align-items:center;gap:20px}
+.dot{width:10px;height:10px;border-radius:50%;background:#1DC981;box-shadow:0 0 8px #1DC981;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.banner .t{font-size:14px;color:#a9aeff;font-weight:500}
+.banner .d{font-size:12px;color:#888;margin-left:auto}
+.params{display:flex;gap:16px;padding:12px 16px;background:#12151f;border:1px solid #1e2130;border-radius:8px;margin-bottom:20px;font-size:11px;flex-wrap:wrap}
+.params .i{display:flex;gap:4px;align-items:center}
+.params .l{color:#666}
+.params .v{color:#a9aeff;font-family:monospace;font-weight:500}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+.card{background:#12151f;border:1px solid #1e2130;border-radius:12px;padding:20px}
+.card .l{font-size:12px;color:#888;margin-bottom:6px}
+.card .v{font-size:24px;font-weight:700;font-family:Inter,monospace;line-height:1.2}
+.card .s{font-size:11px;color:#666;margin-top:4px}
+.card.pos .v{color:#1DC981}
+.card.neg .v{color:#E8463A}
+.card.hl .v{color:#4B3FE3}
+.card.ac .v{color:#27D2BF}
+.chart-row{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:20px}
+.chart-box{background:#12151f;border:1px solid #1e2130;border-radius:12px;padding:20px}
+.chart-title{font-size:14px;font-weight:600;color:#e5e5e5;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.chart-title::before{content:'';width:3px;height:14px;background:#4B3FE3;border-radius:2px}
+.chart{width:100%;height:300px}
+.pos-card{background:#12151f;border:1px solid #1e2130;border-radius:12px;padding:20px}
+.pos-card .pt{font-size:14px;font-weight:600;color:#e5e5e5;margin-bottom:16px;display:flex;align-items:center;gap:6px}
+.pos-card .pt::before{content:'';width:3px;height:14px;background:#27D2BF;border-radius:2px}
+.pm{text-align:center;padding:14px 0;border-bottom:1px solid #1e2130;margin-bottom:12px}
+.pm .pn{font-size:18px;font-weight:700;color:#fff;margin-bottom:2px}
+.pm .pc{font-size:11px;color:#666;font-family:monospace}
+.pr{display:flex;justify-content:space-between;padding:8px 0;font-size:12px;border-bottom:1px solid #151825}
+.pr:last-child{border:none}
+.pr .k{color:#888}
+.pr .v{font-weight:600;font-family:monospace}
+.pr .v.p{color:#1DC981}
+.pr .v.n{color:#E8463A}
+.trades{background:#12151f;border:1px solid #1e2130;border-radius:12px;padding:20px;margin-bottom:20px}
+.trades .st{font-size:14px;font-weight:600;color:#e5e5e5;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.trades .st::before{content:'';width:3px;height:14px;background:#EFAA17;border-radius:2px}
+.tb{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{padding:10px 12px;text-align:center;border-bottom:1px solid #1e2130}
+th{color:#888;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px;background:#151825}
+tr:hover{background:rgba(75,63,227,.04)}
+td.b{color:#1DC981;font-weight:600}
+td.s{color:#E8463A;font-weight:600}
+td.p{color:#1DC981}
+td.n{color:#E8463A}
+.footer{text-align:center;padding:24px 0 12px;color:#444;font-size:11px}
+.empty{text-align:center;padding:40px 20px;color:#666}
+.empty .ic{font-size:32px;margin-bottom:8px}
+@media(max-width:768px){.metrics{grid-template-columns:repeat(2,1fr)}.chart-row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>ETF动量轮动 · <span>模拟盘</span></h1>
+    <div class="update-time" id="ut">加载中...</div>
+  </div>
+  <div class="banner">
+    <div class="dot"></div>
+    <div class="t">模拟盘运行中 · 每日自动更新</div>
+    <div class="d" id="ri">—</div>
+  </div>
+  <div class="params">
+    <div class="i"><span class="l">动量:</span><span class="v">20日</span></div>
+    <div class="i"><span class="l">均线:</span><span class="v">30日</span></div>
+    <div class="i"><span class="l">持仓:</span><span class="v">2天</span></div>
+    <div class="i"><span class="l">优势:</span><span class="v">4%</span></div>
+    <div class="i"><span class="l">成本:</span><span class="v">0.1%</span></div>
+    <div class="i"><span class="l">标的:</span><span class="v">12只</span></div>
+  </div>
+  <div class="metrics">
+    <div class="card hl"><div class="l">总资产</div><div class="v" id="tv">¥—</div><div class="s">初始 ¥100,000</div></div>
+    <div class="card" id="trc"><div class="l">累计收益</div><div class="v" id="tr">—</div><div class="s" id="trs">—</div></div>
+    <div class="card ac"><div class="l">累计交易</div><div class="v" id="tt">0笔</div><div class="s" id="td">0天</div></div>
+    <div class="card"><div class="l">最大回撤</div><div class="v" id="md">—</div><div class="s" id="mdd">—</div></div>
+  </div>
+  <div class="chart-row">
+    <div class="chart-box"><div class="chart-title">净值曲线</div><div class="chart" id="ec"></div></div>
+    <div class="pos-card"><div class="pt">当前持仓</div><div id="pc"><div class="empty"><div class="ic">📊</div>暂无持仓</div></div></div>
+  </div>
+  <div class="trades"><div class="st">最近交易</div><div class="tb" id="ttb"><div class="empty"><div class="ic">📝</div>暂无记录</div></div></div>
+  <div class="footer"><p>ETF动量轮动策略 · 模拟盘 · 仅供验证，不构成投资建议</p></div>
+</div>
+<script>
+let chart=null;
+function fmt(n){if(n==null||isNaN(n))return'—';return'¥'+n.toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function fmtp(n){if(n==null||isNaN(n))return'—';return(n>=0?'+':'')+n.toFixed(2)+'%'}
+function calcDD(vs){if(!vs||vs.length<2)return{v:0,i:0};let p=vs[0],m=0,mi=0;for(let i=1;i<vs.length;i++){if(vs[i]>p)p=vs[i];const d=(vs[i]-p)/p*100;if(d<m){m=d;mi=i}}return{v:m,i:mi}}
+function parseCSV(t){const l=t.trim().split('\n');if(l.length<2)return[];const h=l[0].split(',');return l.slice(1).map(r=>{const c=r.split(',');const o={};h.forEach((k,i)=>{let v=c[i];if(v!==undefined&&v!==''){const n=parseFloat(v);if(!isNaN(n)&&v!==''&&!/^0\d/.test(v))v=n}o[k.trim()]=v});return o})}
+function render(state,equity,trades){
+  const cap=100000,tv=equity.length>0?equity[equity.length-1].value:cap,tr=(tv/cap-1)*100;
+  document.getElementById('ut').textContent='更新: '+(state.last_update||'-');
+  document.getElementById('ri').textContent='起始: '+(state.start_date||'-');
+  document.getElementById('tv').textContent=fmt(tv);
+  const rc=document.getElementById('trc');rc.className='card '+(tr>=0?'pos':'neg');
+  document.getElementById('tr').textContent=fmtp(tr);
+  document.getElementById('trs').textContent=(tr>=0?'+':'')+'¥'+(tv-cap).toLocaleString('zh-CN',{maximumFractionDigits:0});
+  document.getElementById('tt').textContent=(state.total_trades||0)+'笔';
+  document.getElementById('td').textContent='运行 '+equity.length+'天';
+  const dd=calcDD(equity.map(e=>e.value));
+  document.getElementById('md').textContent=dd.v.toFixed(2)+'%';
+  if(equity[dd.i])document.getElementById('mdd').textContent=equity[dd.i].date;
+  const pc=document.getElementById('pc');
+  if(state.position&&state.position_name){
+    const le=equity[equity.length-1],pv=le.value-state.cash,cp=state.shares>0?pv/state.shares:0;
+    const pp=state.cost_basis>0?(cp/state.cost_basis-1)*100:0,pc2=pp>=0?'p':'n';
+    pc.innerHTML=`<div class="pm"><div class="pn">${state.position_name}</div><div class="pc">${state.position}</div></div>
+      <div class="pr"><span class="k">持仓</span><span class="v">${state.shares}份</span></div>
+      <div class="pr"><span class="k">天数</span><span class="v">${state.hold_days}天</span></div>
+      <div class="pr"><span class="k">成本</span><span class="v">¥${state.cost_basis.toLocaleString()}</span></div>
+      <div class="pr"><span class="k">现价</span><span class="v">¥${cp.toFixed(2)}</span></div>
+      <div class="pr"><span class="k">浮盈</span><span class="v ${pc2}">${fmtp(pp)}</span></div>
+      <div class="pr"><span class="k">可用</span><span class="v">${fmt(state.cash)}</span></div>`;
+  }else{pc.innerHTML='<div class="empty"><div class="ic">💤</div>空仓等待中<div style="font-size:11px;color:#666;margin-top:6px">暂无标的</div></div>'}
+  renderChart(equity);renderTrades(trades);
+}
+function renderChart(equity){
+  const cx=document.getElementById('ec').getContext('2d');
+  if(chart)chart.destroy();
+  const g=cx.createLinearGradient(0,0,0,300);g.addColorStop(0,'rgba(75,63,227,.3)');g.addColorStop(1,'rgba(75,63,227,0)');
+  chart=new Chart(cx,{type:'line',data:{labels:equity.map(e=>e.date),datasets:[{label:'净值',data:equity.map(e=>e.value),borderColor:'#4B3FE3',backgroundColor:g,borderWidth:2,fill:true,tension:.3,pointRadius:0,pointHoverRadius:5,pointHoverBackgroundColor:'#4B3FE3',pointHoverBorderColor:'#fff',pointHoverBorderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1d2e',titleColor:'#e5e5e5',bodyColor:'#a9aeff',borderColor:'#2a2f45',borderWidth:1,padding:10,callbacks:{label:c=>'净值: ¥'+c.parsed.y.toLocaleString('zh-CN',{maximumFractionDigits:2})}}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#666',maxTicksLimit:8,font:{size:10}}},y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#666',font:{size:10},callback:v=>'¥'+(v/10000).toFixed(1)+'万'}}}}});
+}
+function renderTrades(trades){
+  const tb=document.getElementById('ttb');
+  if(!trades||trades.length===0){tb.innerHTML='<div class="empty"><div class="ic">📝</div>暂无记录</div>';return}
+  const rc=trades.slice(-20).reverse();
+  let h='<table><thead><tr><th>日期</th><th>操作</th><th>标的</th><th>价格</th><th>数量</th><th>金额</th><th>盈亏</th><th>原因</th></tr></thead><tbody>';
+  for(const t of rc){
+    const ac=t.action==='买入'?'b':'s';
+    const pnl=t.pnl!=null?((t.pnl>=0?'+':'')+'¥'+Number(t.pnl).toLocaleString()):(t.return!=null&&t.return!==''?((t.return>=0?'+':'')+t.return+'%'):'—');
+    const pc=t.pnl>0||t.return>0?'p':(t.pnl<0||t.return<0?'n':'');
+    h+=`<tr><td>${t.date}</td><td class="${ac}">${t.action}</td><td>${t.name}</td><td style="font-family:monospace">${t.price}</td><td style="font-family:monospace">${t.shares}</td><td style="font-family:monospace">¥${Number(t.amount).toLocaleString()}</td><td class="${pc}">${pnl}</td><td style="color:#888;font-size:11px;text-align:left">${t.reason||'-'}</td></tr>`;
+  }
+  h+='</tbody></table>';tb.innerHTML=h;
+}
+Promise.all([
+  fetch('state.json').then(r=>r.json()),
+  fetch('equity.csv').then(r=>r.text()).then(t=>parseCSV(t)),
+  fetch('trades.csv').then(r=>r.text()).then(t=>parseCSV(t))
+]).then(([s,e,t])=>{render(s,e,t)}).catch(err=>{
+  document.getElementById('ut').textContent='数据加载失败';
+  console.error(err);
+});
+window.addEventListener('resize',()=>{if(chart)chart.resize()});
+</script>
+</body>
+</html>
